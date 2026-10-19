@@ -6,11 +6,13 @@ on every `git push`. Built for the System Architecture and Integration final pro
 ## Team
 | Member | Role |
 |---|---|
-| _Name 1_ | Project Lead / Scrum Master |
-| _Name 2_ | DevOps / CI-CD Engineer |
-| _Name 3_ | Infrastructure Engineer |
-| _Name 4_ | Backend and Database Engineer |
-| _Name 5_ | Frontend, QA, and Documentation Lead |
+| Lumerio, Acelander Aaron T. | Project Lead / Scrum Master, Frontend, QA, and Documentation Lead |
+| Layug, Cian Daniel Kyle T. | DevOps / CI-CD Engineer |
+| Gomez, Charles Edward C. | Infrastructure Engineer |
+| Sangalang, Prince Mark Johnson | Backend and Database Engineer |
+| 
+
+Repository: https://github.com/acelanderaarontongol-cmd/equipgo
 
 ## Architecture
 ```
@@ -40,7 +42,9 @@ Git, Docker (Compose v2), 8 GB RAM recommended.
 
 ## Run the application locally
 ```bash
-cp .env.example .env        # then edit the password
+git clone https://github.com/acelanderaarontongol-cmd/equipgo.git
+cd equipgo
+cp .env.example .env        # Windows PowerShell: copy .env.example .env, then edit the password
 docker compose up -d --build
 # open http://localhost:8080
 ```
@@ -55,7 +59,7 @@ docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 Open http://localhost:8081, install suggested plugins + **Docker Pipeline**, create the admin user.
 Then:
 1. Manage Jenkins > Credentials: add a **Secret file** with ID `equipgo-env` (your real `.env`).
-   Add a Git access token too if the repo is private.
+   The repository is public, so no Git access token is needed.
 2. New Item > Pipeline > *Pipeline script from SCM* > repo URL, branch `main`, Script Path `Jenkinsfile`.
 3. Verify: `docker exec jenkins docker ps`.
 
