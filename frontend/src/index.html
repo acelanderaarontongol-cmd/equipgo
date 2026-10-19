@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EquipGo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { margin-bottom: 0; } h2 { margin-top: 2rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid #ddd; }
+    form { display: flex; gap: .5rem; flex-wrap: wrap; margin: .75rem 0; }
+    input, button { padding: .4rem .6rem; font: inherit; }
+    footer { margin-top: 3rem; color: #666; font-size: .9rem; }
+    #msg { color: #b00020; min-height: 1.2rem; }
+  </style>
+</head>
+<body>
+  <h1>EquipGo</h1>
+  <p>Campus lab equipment borrowing</p>
+  <div id="msg"></div>
+
+  <h2>Equipment</h2>
+  <table><thead><tr><th>Name</th><th>Category</th><th>Available</th><th>Borrow</th></tr></thead>
+    <tbody id="equipment"></tbody></table>
+
+  <form id="add-form">
+    <input id="e-name" placeholder="New equipment name" required>
+    <input id="e-cat" placeholder="Category">
+    <input id="e-qty" type="number" min="0" value="1" required>
+    <button>Add equipment</button>
+  </form>
+
+  <h2>Borrowings</h2>
+  <table><thead><tr><th>#</th><th>Equipment</th><th>Borrower</th><th>Due</th><th>Status</th><th></th></tr></thead>
+    <tbody id="borrowings"></tbody></table>
+
+  <h2>Notifications (from the background worker)</h2>
+  <ul id="notifications"></ul>
+
+  <footer>EquipGo &middot; Build <strong id="build">__BUILD__</strong></footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const say = (t) => { $('msg').textContent = t || ''; };
+
+function cell(tr, text) { const td = document.createElement('td'); td.textContent = text ?? ''; tr.appendChild(td); return td; }
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+  return body;
+}
+const post = (path, data) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+
+async function loadEquipment() {
+  const items = await api('/api/inventory/equipment');
+  const tbody = $('equipment'); tbody.replaceChildren();
+  for (const it of items) {
+    const tr = document.createElement('tr');
+    cell(tr, it.name); cell(tr, it.category); cell(tr, `${it.available} / ${it.quantity}`);
+    const td = cell(tr, '');
+    const who = document.createElement('input'); who.placeholder = 'Your name'; who.size = 12;
+    const btn = document.createElement('button'); btn.textContent = 'Borrow'; btn.disabled = it.available === 0;
+    btn.onclick = async () => {
+      try { await post('/api/borrow/borrowings', { equipment_id: it.id, borrower: who.value, days: 3 }); say(''); refresh(); }
+      catch (e) { say(e.message); }
+    };
+    td.append(who, ' ', btn); tbody.appendChild(tr);
+  }
+}
+
+async function loadBorrowings() {
+  const rows = await api('/api/borrow/borrowings');
+  const tbody = $('borrowings'); tbody.replaceChildren();
+  for (const b of rows) {
+    const tr = document.createElement('tr');
+    cell(tr, b.id); cell(tr, b.equipment); cell(tr, b.borrower); cell(tr, b.due_date); cell(tr, b.status);
+    const td = cell(tr, '');
+    if (b.status === 'borrowed') {
+      const btn = document.createElement('button'); btn.textContent = 'Return';
+      btn.onclick = async () => { try { await post(`/api/borrow/borrowings/${b.id}/return`); refresh(); } catch (e) { say(e.message); } };
+      td.appendChild(btn);
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+async function loadNotifications() {
+  const rows = await api('/api/borrow/notifications');
+  const ul = $('notifications'); ul.replaceChildren();
+  for (const n of rows) { const li = document.createElement('li'); li.textContent = `${n.created_at.slice(0, 19)} - ${n.message}`; ul.appendChild(li); }
+}
+
+function refresh() { Promise.all([loadEquipment(), loadBorrowings(), loadNotifications()]).catch((e) => say(e.message)); }
+
+$('add-form').onsubmit = async (ev) => {
+  ev.preventDefault();
+  try {
+    await post('/api/inventory/equipment', { name: $('e-name').value, category: $('e-cat').value || 'general', quantity: Number($('e-qty').value) });
+    ev.target.reset(); say(''); refresh();
+  } catch (e) { say(e.message); }
+};
+
+refresh(); setInterval(loadNotifications, 5000);
+</script>
+</body>
+</html>

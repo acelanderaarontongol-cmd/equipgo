@@ -1,0 +1,97 @@
+name: equipgo
+
+services:
+  proxy:
+    build: ./proxy
+    image: equipgo/proxy:${TAG:-latest}
+    ports:
+      - "8080:80"            # the ONLY published port of the application stack
+    depends_on:
+      frontend:
+        condition: service_healthy
+      inventory-api:
+        condition: service_healthy
+      borrow-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [equipgo-net]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BUILD_NUMBER: ${TAG:-dev}
+    image: equipgo/frontend:${TAG:-latest}
+    restart: unless-stopped
+    networks: [equipgo-net]
+
+  inventory-api:
+    build:
+      context: ./inventory-api
+      target: production
+    image: equipgo/inventory-api:${TAG:-latest}
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [equipgo-net]
+
+  borrow-api:
+    build:
+      context: ./borrow-api
+      target: production
+    image: equipgo/borrow-api:${TAG:-latest}
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [equipgo-net]
+
+  worker:
+    build:
+      context: ./worker
+      target: production
+    image: equipgo/worker:${TAG:-latest}
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [equipgo-net]
+
+  db:
+    build: ./db
+    image: equipgo/db:${TAG:-latest}
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data      # named volume: data survives redeploys
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [equipgo-net]                   # no "ports:" -> not reachable from the host
+
+volumes:
+  db-data:
+
+networks:
+  equipgo-net:
